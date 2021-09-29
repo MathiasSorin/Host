@@ -21,6 +21,11 @@ function blobAnim()
 
 function HAnim()
 {
+	if(dead) 
+	{
+		image_xscale = facingSide
+		currentState = HSTATE.DEAD
+	}
 	switch (currentState)
 	{
 		case HSTATE.DEAD:
@@ -38,6 +43,11 @@ function HAnim()
 function HSAnim()
 {
 	if(pushing and !dead) currentState = HSSTATE.PUSH
+	if(dead) 
+	{
+		image_xscale = facingSide
+		currentState = HSTATE.DEAD
+	}
 	switch (currentState)
 	{
 		case HSSTATE.DEAD:

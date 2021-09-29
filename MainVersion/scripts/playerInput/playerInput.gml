@@ -20,20 +20,25 @@ function playerInput()
 	inputLeftStickH = gamepad_axis_value(0, gp_axislh)
 	inputRightStickH = gamepad_axis_value(0, gp_axisrh)
 	inputRightStickV = gamepad_axis_value(0, gp_axisrv)
-	inputInteract = gamepad_button_check_pressed(0, gp_face1)
+	inputInteract = gamepad_button_check_pressed(0, gp_face3)
 	inputJump = gamepad_button_check_pressed(0, gp_shoulderrb)
+	inputJumpBlob = gamepad_button_check_pressed(0, gp_face1)
 	inputRestart = gamepad_button_check_pressed(0, gp_select)
+	inputStart = gamepad_button_check_pressed(0, gp_start)
 	
 	moveX = inputLeftStickH * selfSpeed
 	
+	//Audio
 	if(sign(inputLeftStickH) != 0 and object_index = obj_Blob and !audio_is_playing(sd_BlobWalk) and !audio_is_playing(sd_BlobWalk2)and grounded) 
 	{
 		rand = irandom(1)
 		if(rand) audio_play_sound(sd_BlobWalk, 0.1, false)
 		else audio_play_sound(sd_BlobWalk2, 0.1, false)
 	}
+	if(sign(inputLeftStickH) != 0 and !audio_is_playing(sd_FootStep2) and grounded and object_index == obj_H) audio_play_sound(sd_FootStep2, 0.1, false)
+	if(sign(inputLeftStickH) != 0 and !audio_is_playing(sd_FootStep2) and grounded and object_index == obj_HStrong) audio_play_sound(sd_FootStep2, 0.1, false)
 	
-	//ANIM
+	//Anim
 	if(sign(inputLeftStickH) != 0 and sprite_index == spr_StrongManPush) idle = false
 	else idle = true
 	if(sign(inputLeftStickH) != 0 and sprite_index != spr_StrongManPush) 
@@ -71,14 +76,18 @@ function playerInput()
 		{
 			if(object_index == obj_H)
 			{
+				gamepad_set_vibration(0, 0, 0)
 				target = collision_circle(x, y, 20, obj_Computer, false, true)
-				if(!target) target = collision_circle(x, y, 20, obj_ComputerMobile, false, true)
-				if(target.dead) return false
+				if(!target or target.dead) target = collision_circle(x, y, 20, obj_ComputerMobile, false, true)
+				if(!instance_exists(target) or target.dead) return false
 				target.dead = true
+				if(!instance_exists(target.door)) return false
 				target.door.sprite_index = spr_DoorOpen
 				if(target.door2 != 0) target.door2.sprite_index = spr_DoorOpen
-				target.sprite_index = spr_ComputerOff
+				if(target.object_index == obj_Computer) target.sprite_index = spr_ComputerOff
+				else target.sprite_index = spr_ComputerMobileOff
 				game_save("currentLevel.dat")
+				ClearBloodSplatter()
 				room_goto(FolderMiniGame)
 				return false
 			}
@@ -106,6 +115,7 @@ function playerInput()
 				else image_xscale =-1
 				target.idH = id
 				target.follow = true
+				pushingCrateId = target.id
 			}
 			else
 			{
@@ -113,6 +123,7 @@ function playerInput()
 				pushing = false
 				target.idH = 0
 				target.follow = false
+				pushingCrateId = noone
 			}
 		}
 		if(collision_circle(x, y, 20, obj_H, false, true) and object_index == obj_Blob)
@@ -128,6 +139,8 @@ function playerInput()
 			man_GameManager.timer = 100
 			man_GameManager.player = tempList[|i].id
 			ds_list_destroy(tempList)
+			man_GameManager.canInteract = false
+			man_GameManager.alarm[1] = 20
 			return false
 		}
 		if(collision_circle(x, y, 20, obj_HStrong, false, true) and object_index == obj_Blob)
@@ -142,12 +155,15 @@ function playerInput()
 			instance_destroy(obj_Blob)
 			man_GameManager.timer = 100
 			man_GameManager.player = tempList[|i].id
+			ds_list_destroy(tempList)
+			man_GameManager.canInteract = false
+			man_GameManager.alarm[1] = 20
 			return false
 		}
 		man_GameManager.canInteract = false
 		man_GameManager.alarm[1] = 20
 	}
-	if(inputJump and grounded)
+	if(inputJumpBlob and grounded)
 	{
 		if(object_index == obj_Blob)
 		{
@@ -159,18 +175,25 @@ function playerInput()
 			if(rand) audio_play_sound(sd_Jump, 0.5, false)
 			else audio_play_sound(sd_Jump2, 0.5, false)
 		}
-		else 
-		{
-			playerHOut(id)
-		}
 	}
+	if(inputJump and object_index != obj_Blob and grounded) playerHOut(id)
 	if(inputRestart)
 	{
+		gamepad_set_vibration(0, 0, 0)
 		man_GameManager.alarm[0] = -1
 		man_GameManager.timer = 100
+		ClearBloodSplatter()
 		game_load("startingLevel.dat")
 	}
-	
+	if(inputStart) 
+	{
+		gamepad_set_vibration(0, 0, 0)
+		game_save("currentLevel.dat")
+		ClearBloodSplatter()
+		room_goto(Room_Pause)
+		return false
+	}
+
 	//Horizontal Collision check
 	if(place_meeting(x + moveX, y, obj_Collision)) moveX = 0
 	if(place_meeting(x + moveX, y, obj_Crate) and object_index == obj_Blob) moveX = 0
@@ -188,32 +211,59 @@ function playerInputFiole()
 {
 	if(instance_exists(obj_MainCamera) and !first) obj_MainCamera.follow = id
 	man_GameManager.player = id
-	inputJump = gamepad_button_check_pressed(0, gp_shoulderrb)
+	inputJump = gamepad_button_check_pressed(0, gp_face1)
+	inputJump2 = gamepad_button_check_pressed(0, gp_shoulderrb)
 	inputRestart = gamepad_button_check_pressed(0, gp_select)
+	inputStart = gamepad_button_check_pressed(0, gp_start)
 	
-	if(inputJump)
+	if(inputJump or inputJump2)
 	{
 		possessed = false
 		dead = true
 		instance_create_layer(x, y - sprite_height/2, "Instances", obj_Blob)
 		sprite_index = spr_FioleBreaking
-		man_GameManager.alarm[0] = 60
+		man_GameManager.alarm[0] = 30
 		audio_play_sound(sd_ExitFiole , 0.5, false)
 	}
 	if(inputRestart)
 	{
+		gamepad_set_vibration(0, 0, 0)
 		man_GameManager.alarm[0] = -1
 		man_GameManager.timer = 100
+		ClearBloodSplatter()
 		game_load("startingLevel.dat")
+	}
+	if(inputStart) 
+	{
+		gamepad_set_vibration(0, 0, 0)
+		game_save("currentLevel.dat")
+		ClearBloodSplatter()
+		room_goto(Room_Pause)
+		return false
 	}
 }
 
 function playerHOut(H)
 {
+	gamepad_set_vibration(0, 1, 1)
+	man_GameManager.alarm[3] = 15
+	possessed = false
 	audio_play_sound(sd_HeadExplosion, 1, false)
-	if(H.object_index == obj_H) H.currentState = HSTATE.DEAD
-	if(H.object_index == obj_HStrong) H.currentState = HSSTATE.DEAD
-	H.dead = true
+	BloodSplatter(H.x, H.y, H.sprite_height)
+	if(H.object_index == obj_H) 
+	{
+		H.facingSide = image_xscale
+		H.dead = true
+		H.currentState = HSTATE.DEAD
+	}
+	if(H.object_index == obj_HStrong) 
+	{
+		H.facingSide = image_xscale
+		H.dead = true
+		H.currentState = HSSTATE.DEAD
+		H.pushing = false
+		if(H.pushingCrateId) H.pushingCrateId.follow = false
+	}
 	target = instance_create_layer(H.x, H.y - H.sprite_height/2, "Instances", obj_Blob)
 	if(instance_exists(obj_Arrow))
 	{
@@ -231,15 +281,17 @@ function playerHOut(H)
 
 function playerDead(who)
 {
+	gamepad_set_vibration(0, 0, 0)
 	if(who == obj_Blob)
 	{
+		if(obj_Blob.currentState != STATE.DEAD) audio_play_sound(sd_BlobDeath, 1, false)
 		obj_Blob.currentState = STATE.DEAD
-		audio_play_sound(sd_BlobDeath, 1, false)
 		return false
 	}
 	man_GameManager.player = noone
 	man_GameManager.alarm[0] = -1
 	man_GameManager.timer = 100
+	ClearBloodSplatter()
 	game_load("startingLevel.dat")
 	return false
 }
